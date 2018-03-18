@@ -218,6 +218,7 @@ void activator(TCB* next){
 
 		enable_interrupt();
 		setcontext (&(next->run_env));
+		printf("mythread_free: After setcontext, should never get here!!...\n");
 	}
 	else{
 		printf("*** SWAPCONTEXT FROM %i TO %i\n", temp->tid, current);
@@ -226,5 +227,4 @@ void activator(TCB* next){
 		swapcontext(&(temp->run_env),&(next->run_env));
 	}
 
-	printf("mythread_free: After setcontext, should never get here!!...\n");
 }
