@@ -3,13 +3,13 @@
 CC	= gcc
 LD	= gcc
 
-CFLAGS	= -g -Wall 
-CFLAGS	+= -I. 
+CFLAGS	= -g -Wall
+CFLAGS	+= -I.
 LDFLAGS	= libinterrupt.a
 HEADERS = mythread.h queue.h
 
 
-OBJS	= mythreadlib.o queue.o 
+OBJS	= mythreadlib.o queue.o
 
 LIBS	= -lm -lrt
 
@@ -28,8 +28,7 @@ libinterrupt.a: interrupt.o
 $(PRGS): $(OBJS)
 $(PRGS): $(LIBS)
 $(PRGS): % : %.o
-	$(CC) $(CFLAGS) -o $@ $< $(OBJS) $(LDFLAGS) $(LIBS)
+	$(CC) $(CFLAGS)-g -o $@ $< $(OBJS) $(LDFLAGS) $(LIBS)
 
 clean:
 	-rm -f *.o *.a *~ $(PRGS)
-

@@ -21,12 +21,12 @@
 #define SYSTEM 2
 /* Structure containing thread state  */
 typedef struct tcb{
-  int state; /* the state of the current block: FREE or INIT */
-  int tid; /* thread id*/
-  int priority; /* thread priority*/
-  int ticks;
-  void (*function)(int);  /* the code of the thread */
-  ucontext_t run_env; /* Context of the running environment*/
+	int state; /* the state of the current block: FREE or INIT */
+	int tid; /* thread id*/
+	int priority; /* thread priority*/
+	int ticks;
+	void (*function)(int);  /* the code of the thread */
+	ucontext_t run_env; /* Context of the running environment*/
 }TCB;
 
 int mythread_create (void (*fun_addr)(), int priority); /* Creates a new thread with one argument */

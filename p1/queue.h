@@ -7,15 +7,15 @@
 
 struct my_struct
 {
-  void *data;
-  struct my_struct* next;
+	void *data;
+	struct my_struct* next;
 };
 
 
 struct queue
 {
-  struct my_struct* head;
-  struct my_struct* tail;
+	struct my_struct* head;
+	struct my_struct* tail;
 };
 
 /* Enqueue an element */
@@ -33,5 +33,3 @@ void queue_print(struct queue* );
 void queue_print_element(struct my_struct* );
 
 #endif
-
-
