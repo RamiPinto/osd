@@ -1,4 +1,4 @@
-include <stdio.h>
+#include <stdio.h>
 #include <sys/time.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -28,12 +28,23 @@ static int init=0;
 /* Thread control block for the idle thread */
 static TCB idle;
 static void idle_function(){
-  while(1);
+	while(1);
 }
+
+//Declare high priority and low priority queues
+struct queue * hp_q;
+struct queue * lp_q;
+struct queue * w_q;
 
 /* Initialize the thread library */
 void init_mythreadlib() {
 	int i;
+
+	//Initialize queues
+	hp_q = queue_new();
+	lp_q = queue_new();
+	w_q = queue_new();
+
 	/* Create context for the idle thread */
 	if(getcontext(&idle.run_env) == -1){
 		perror("*** ERROR: getcontext in init_thread_lib");
@@ -61,6 +72,11 @@ void init_mythreadlib() {
 		exit(5);
 	}
 
+	if(QUANTUM_TICKS < 0){
+		printf("*** ERROR: QUANTUM TICKS must not be lower than 1\n");
+		exit(-1);
+	}
+
 	for(i=1; i<N; i++){
 		t_state[i].state = FREE;
 	}
@@ -84,7 +100,7 @@ int mythread_create (void (*fun_addr)(),int priority)
 		if (t_state[i].state == FREE) break;
 	if (i == N) return(-1);
 	if(getcontext(&t_state[i].run_env) == -1){
-		perror("*** ERROR: getcontext in my_thread_create");
+		perror("*** ERROR: getcontext in my_thread_create\n");
 		exit(-1);
 	}
 	t_state[i].state = INIT;
@@ -98,19 +114,74 @@ int mythread_create (void (*fun_addr)(),int priority)
 	t_state[i].tid = i;
 	t_state[i].run_env.uc_stack.ss_size = STACKSIZE;
 	t_state[i].run_env.uc_stack.ss_flags = 0;
+	t_state[i].ticks = QUANTUM_TICKS;
+
 	makecontext(&t_state[i].run_env, fun_addr, 1);
+
+	//Insert process into its corresponding queue
+	if(t_state[i].priority == HIGH_PRIORITY){
+		enqueue(hp_q, &t_state[i]);
+	}
+	else{
+		enqueue(lp_q, &t_state[i]);
+	}
+
+	printf("*** THREAD %d READY\n", t_state[i].tid);
+
+	/* If low priority process is running and a high priority process arrives,
+	we stop the low priority process execution to execute the high priority one*/
+	if(running->priority == LOW_PRIORITY && t_state[i].priority == HIGH_PRIORITY) {
+		disable_interrupt();
+		disable_network_interrupt();
+		activator(scheduler());
+	}
+
 	return i;
 } /****** End my_thread_create() ******/
 
 /* Read network syscall */
 int read_network()
 {
+	if (running->state != WAITING) {
+		running->state = WAITING;
+		enqueue(w_q, running);
+		printf("*** THREAD %d READ FROM NETWORK\n", current);
+	}
+
 	return 1;
 }
 
 /* Network interrupt  */
 void network_interrupt(int sig)
 {
+	if(queue_empty(w_q) == 0){
+		TCB* d = dequeue(w_q);
+
+		if (d->priority == HIGH_PRIORITY) {
+			enqueue(hp_q, d);
+		} else {
+			enqueue(lp_q, d);
+		}
+
+		printf("*** THREAD %d READY\n", d->tid);
+
+		if(running->priority == LOW_PRIORITY && running->ticks == 0){
+			running->ticks = QUANTUM_TICKS;
+			disable_interrupt();
+			disable_network_interrupt();
+			TCB* next = scheduler();
+			activator(next);
+		}
+	}
+
+	//Reset quantum ticks to low priority porcesses
+//	if(running->priority == LOW_PRIORITY && running->ticks == 0){
+//		running->ticks = QUANTUM_TICKS;
+//		disable_interrupt();
+//		disable_network_interrupt();
+//		TCB* next = scheduler();
+//		activator(next);
+//	}
 }
 
 
@@ -122,8 +193,16 @@ void mythread_exit() {
 	t_state[tid].state = FREE;
 	free(t_state[tid].run_env.uc_stack.ss_sp);
 
-	TCB* next = scheduler();
-	activator(next);
+	//If there are still processes in any queue, we select the next process to execute
+	if(queue_empty(hp_q) == 0 || queue_empty(lp_q) == 0){
+		disable_interrupt();
+		disable_network_interrupt();
+		TCB* next = scheduler();
+		activator(next);
+	}
+
+	printf("FINISH\n");
+	exit(0);
 }
 
 /* Sets the priority of the calling thread */
@@ -148,25 +227,92 @@ int mythread_gettid(){
 
 /* FIFO para alta prioridad, RR para baja*/
 TCB* scheduler(){
-	int i;
-	for(i=0; i<N; i++){
-		if (t_state[i].state == INIT) {
-			current = i;
-			return &t_state[i];
+
+	//If running process has not ended, we insert it at the end of the corresponding queue
+	if(running->state!=FREE){
+		if(running->priority == HIGH_PRIORITY){
+			enqueue(hp_q, running);
+		}
+		else{
+			enqueue(lp_q, running);
 		}
 	}
-	printf("mythread_free: No thread in the system\nExiting...\n");
-	exit(1);
-}
 
+	if(queue_empty(hp_q) == 0){
+		return dequeue(hp_q);
+	}
+	else{
+		if(queue_empty(lp_q) == 0){
+			return dequeue(lp_q);
+		}
+		else{
+			return &idle;
+		}
+	}
+}
 
 /* Timer interrupt  */
 void timer_interrupt(int sig)
 {
+	//Reduce ticks remaining to finish the process in each clock interrupt
+	running->ticks--;
+
+	//Reset quantum ticks to low priority porcesses
+	if(running->priority == LOW_PRIORITY && running->ticks == 0){
+		running->ticks = QUANTUM_TICKS;
+		disable_interrupt();
+		TCB* next = scheduler();
+		activator(next);
+	}
 }
 
 /* Activator */
 void activator(TCB* next){
-	setcontext (&(next->run_env));
-	printf("mythread_free: After setcontext, should never get here!!...\n");
+
+	TCB * temp = running;
+
+	//Update process tid
+	current = next->tid;
+	running = next;
+
+	//Running process finished
+	if(temp->state == FREE){
+		printf("*** THREAD %d FINISHED: SET CONTEXT OF %d \n", temp->tid, next->tid);
+		if(next->priority == LOW_PRIORITY){
+			enable_interrupt();
+			enable_network_interrupt();
+		}
+		setcontext(&(next->run_env));
+		printf("mythread_free: After setcontext, should never get here!!...\n");
+	}
+	else{
+		//Swap from low priority process to high priority one
+		if(running->priority == HIGH_PRIORITY && temp->priority == LOW_PRIORITY){
+			printf("*** THREAD %d PREEMPTED: SET CONTEXT OF %d\n", temp->tid, running->tid);
+
+//			TODO: remove after tests
+//			if(next->priority == LOW_PRIORITY){
+//				enable_interrupt();
+//				enable_network_interrupt();
+//			}
+			swapcontext(&(temp->run_env),&(running->run_env));
+		}
+			//Standard not finished process
+		else{
+			if(temp->tid != next->tid){	//Avoid context swaping of same process
+				if(temp->state == IDLE){
+					printf("*** THREAD READY: SET CONTEXT TO %d\n", next->tid);
+				}
+				else{
+					printf("*** SWAPCONTEXT FROM %d TO %d\n", temp->tid, next->tid);
+				}
+
+				if(next->priority == LOW_PRIORITY){
+					enable_interrupt();
+					enable_network_interrupt();
+				}
+				swapcontext(&(temp->run_env),&(next->run_env));
+			}
+		}
+	}
 }
