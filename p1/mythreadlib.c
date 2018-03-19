@@ -111,7 +111,6 @@ int read_network()
 /* Network interrupt  */
 void network_interrupt(int sig)
 {
-
 }
 
 

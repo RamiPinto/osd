@@ -113,7 +113,7 @@ int mythread_create (void (*fun_addr)(),int priority)
 	t_state[i].ticks = QUANTUM_TICKS;
 	makecontext(&t_state[i].run_env, fun_addr, 1);
 
-	//Insert created process into queue
+	//Insert created process into ready queue
 	enqueue(processes_q, &t_state[i]);
 	printf("*** THREAD %d READY\n", t_state[i].tid);
 
