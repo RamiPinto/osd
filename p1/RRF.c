@@ -258,10 +258,11 @@ void activator(TCB* next){
 		if(running->priority == HIGH_PRIORITY && temp->priority == LOW_PRIORITY){
 			printf("*** THREAD %d PREEMPTED: SET CONTEXT OF %d\n", temp->tid, running->tid);
 
-			if(next->priority == LOW_PRIORITY){
-				enable_interrupt();
-				enable_network_interrupt();
-			}
+			//TODO: remove after tests
+//			if(next->priority == LOW_PRIORITY){
+//				enable_interrupt();
+//				enable_network_interrupt();
+//			}
 			swapcontext(&(temp->run_env),&(running->run_env));
 		}
 		//Standard not finished process
