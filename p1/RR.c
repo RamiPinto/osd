@@ -110,10 +110,12 @@ int mythread_create (void (*fun_addr)(),int priority)
 	t_state[i].tid = i;
 	t_state[i].run_env.uc_stack.ss_size = STACKSIZE;
 	t_state[i].run_env.uc_stack.ss_flags = 0;
+	t_state[i].ticks = QUANTUM_TICKS;
 	makecontext(&t_state[i].run_env, fun_addr, 1);
 
 	//Insert created process into queue
 	enqueue(processes_q, &t_state[i]);
+	printf("*** THREAD %d READY\n", t_state[i].tid);
 
 	return i;
 } /****** End my_thread_create() ******/
@@ -182,6 +184,9 @@ TCB* scheduler(){
 		TCB* next = dequeue(processes_q);
 		return next;
 	}
+	else{
+		return &idle;
+	}
 
 	printf("mythread_free: No thread in the system\nExiting...\n");
 	exit(1);
@@ -214,17 +219,24 @@ void activator(TCB* next){
 	running = next;
 
 	if(temp->state == FREE){
-		printf("*** THREAD %i FINISHED: SET CONTEXT OF %i \n", temp->tid, current);
+		printf("*** THREAD %d FINISHED: SET CONTEXT OF %d \n", temp->tid, current);
 
 		enable_interrupt();
 		setcontext (&(next->run_env));
 		printf("mythread_free: After setcontext, should never get here!!...\n");
 	}
 	else{
-		printf("*** SWAPCONTEXT FROM %i TO %i\n", temp->tid, current);
+		if(temp->tid != next->tid){ //Avoid context swaping of same process
+			if(temp->state == IDLE){
+				printf("*** THREAD READY: SET CONTEXT TO %d\n", next->tid);
+			}
+			else{
+				printf("*** SWAPCONTEXT FROM %d TO %d\n", temp->tid, next->tid);
+			}
 
-		enable_interrupt();
-		swapcontext(&(temp->run_env),&(next->run_env));
+			enable_interrupt();
+			swapcontext(&(temp->run_env),&(next->run_env));
+		}
 	}
 
 }
