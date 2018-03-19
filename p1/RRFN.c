@@ -142,10 +142,16 @@ int mythread_create (void (*fun_addr)(),int priority)
 /* Read network syscall */
 int read_network()
 {
-	if (running->state != WAITING) {
-		running->state = WAITING;
-		enqueue(w_q, running);
-		printf("*** THREAD %d READ FROM NETWORK\n", current);
+	running->state = WAITING;
+	enqueue(w_q, running);
+	printf("*** THREAD %d READ FROM NETWORK\n", current);
+
+	if(running->priority == LOW_PRIORITY && running->ticks == 0){
+		running->ticks = QUANTUM_TICKS;
+		disable_interrupt();
+		disable_network_interrupt();
+		TCB* next = scheduler();
+		activator(next);
 	}
 
 	return 1;
@@ -157,6 +163,7 @@ void network_interrupt(int sig)
 	if(queue_empty(w_q) == 0){
 		TCB* d = dequeue(w_q);
 
+		d->state = INIT;
 		if (d->priority == HIGH_PRIORITY) {
 			enqueue(hp_q, d);
 		} else {
@@ -164,24 +171,7 @@ void network_interrupt(int sig)
 		}
 
 		printf("*** THREAD %d READY\n", d->tid);
-
-		if(running->priority == LOW_PRIORITY && running->ticks == 0){
-			running->ticks = QUANTUM_TICKS;
-			disable_interrupt();
-			disable_network_interrupt();
-			TCB* next = scheduler();
-			activator(next);
-		}
 	}
-
-	//Reset quantum ticks to low priority porcesses
-//	if(running->priority == LOW_PRIORITY && running->ticks == 0){
-//		running->ticks = QUANTUM_TICKS;
-//		disable_interrupt();
-//		disable_network_interrupt();
-//		TCB* next = scheduler();
-//		activator(next);
-//	}
 }
 
 
@@ -229,7 +219,7 @@ int mythread_gettid(){
 TCB* scheduler(){
 
 	//If running process has not ended, we insert it at the end of the corresponding queue
-	if(running->state!=FREE){
+	if(running->state != FREE){
 		if(running->priority == HIGH_PRIORITY){
 			enqueue(hp_q, running);
 		}
@@ -275,43 +265,39 @@ void activator(TCB* next){
 	current = next->tid;
 	running = next;
 
-	//Running process finished
-	if(temp->state == FREE){
-		printf("*** THREAD %d FINISHED: SET CONTEXT OF %d \n", temp->tid, next->tid);
-		if(next->priority == LOW_PRIORITY){
-			enable_interrupt();
-			enable_network_interrupt();
+	if (temp->tid != next->tid && running->state != FREE) {
+		if(temp->state == FREE){
+			printf("*** THREAD %d FINISHED: SET CONTEXT OF %d \n", temp->tid, next->tid);
+			if(next->priority == LOW_PRIORITY){
+				enable_interrupt();
+				enable_network_interrupt();
+			}
+			setcontext (&(next->run_env));
+			printf("mythread_free: After setcontext, should never get here!!...\n");
 		}
-		setcontext(&(next->run_env));
-		printf("mythread_free: After setcontext, should never get here!!...\n");
-	}
-	else{
-		//Swap from low priority process to high priority one
-		if(running->priority == HIGH_PRIORITY && temp->priority == LOW_PRIORITY){
-			printf("*** THREAD %d PREEMPTED: SET CONTEXT OF %d\n", temp->tid, running->tid);
-
-//			TODO: remove after tests
-//			if(next->priority == LOW_PRIORITY){
-//				enable_interrupt();
-//				enable_network_interrupt();
-//			}
-			swapcontext(&(temp->run_env),&(running->run_env));
-		}
-			//Standard not finished process
 		else{
-			if(temp->tid != next->tid){	//Avoid context swaping of same process
-				if(temp->state == IDLE){
-					printf("*** THREAD READY: SET CONTEXT TO %d\n", next->tid);
-				}
-				else{
-					printf("*** SWAPCONTEXT FROM %d TO %d\n", temp->tid, next->tid);
-				}
+			//Swap from low priority process to high priority one
+			if(running->priority == HIGH_PRIORITY && temp->priority == LOW_PRIORITY){
+				printf("*** THREAD %d PREEMPTED: SET CONTEXT OF %d\n", temp->tid, running->tid);
 
-				if(next->priority == LOW_PRIORITY){
-					enable_interrupt();
-					enable_network_interrupt();
+				swapcontext(&(temp->run_env),&(running->run_env));
+			}
+				//Standard not finished process
+			else{
+				if(temp->tid != next->tid){	//Avoid context swaping of same process
+					if(temp->state == IDLE){
+						printf("*** THREAD READY: SET CONTEXT TO %d\n", next->tid);
+					}
+					else{
+						printf("*** SWAPCONTEXT FROM %d TO %d\n", temp->tid, next->tid);
+					}
+
+					if(next->priority == LOW_PRIORITY){
+						enable_interrupt();
+						enable_network_interrupt();
+					}
+					swapcontext(&(temp->run_env),&(next->run_env));
 				}
-				swapcontext(&(temp->run_env),&(next->run_env));
 			}
 		}
 	}
