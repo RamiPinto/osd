@@ -23,6 +23,7 @@
 
 int main() {
 	int ret;
+	//int ret1;
 
 	///////
 	printf("Starting test...\n");
@@ -62,6 +63,41 @@ int main() {
 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST unmountFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 
 	///////
+	/*
+	//File that exists
+	ret = openFile("test.txt");
+	if(ret != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+
+
+	//File that doesn't exist
+	ret = openFile("noexist.txt");
+	if(ret == 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST error openFile ", ANSI_COLOR_RED, "ERROR\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST error openFile", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+
+	//File that exists
+	ret1 = closeFile(ret);
+	if(ret1 != 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST closeFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST closeFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+
+
+	//File that doesn't exist
+	ret = closeFile(ret1);
+	if(ret == 0) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST error closeFile ", ANSI_COLOR_RED, "ERROR\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST error opecloseFilenFile", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+*/
 
 	return 0;
 }

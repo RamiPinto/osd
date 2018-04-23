@@ -56,22 +56,6 @@ int mkFS(long deviceSize)
 	sblocks[0].deviceSize = deviceSize;
 	sblocks[0].crc = 0;
 
-	/*bitmaps = malloc(sizeof(struct fs_bitmap));
-
-	//Free inodes bitmap
-	for(i = 0; i < sblocks[0].numinodes; i++){
-		bitmaps[0].inodes_map[i] = 0;
-	}
-
-	//Free data blocks bitmap
-	for(i = 0; i < sblocks[0].dataNumBlock; i++){
-		bitmaps[0].dataBlocks_map[i] = 0;
-	}
-
-	for(i = 0; i < sblocks[0].numinodes; i++){
-		memset(&(inodes[i]), 0, sizeof(struct inode));
-	}*/
-
 
 	//Unmount the file system from the device to write the default file system into disk
 	if(unmountFS() == -1){
@@ -217,7 +201,27 @@ int createFile(char *fileName)
  */
 int removeFile(char *fileName)
 {
-	return -2;
+	int i, j;
+
+	//Check if file exists
+	if((i = namei(fileName)) == -1){
+		printf("[ERROR] Cannot remove file %s. The file doesn't exist\n", fileName);
+		return -1;
+	}
+
+	if(ifree(i) == -1){
+		printf("[ERROR] Cannot remove file %s. Error freeing bitmap position\n", fileName);
+		return -2;
+	}
+
+	for(j = inodes[i].directBlock; j<inodes[i].size;i++){
+		if(bfree(j) == -1){
+			printf("[ERROR] Cannot remove file %s. Error freeing datablock\n", fileName);
+			return -2;
+		}
+	}
+
+	return 0;
 }
 
 /*
@@ -230,19 +234,19 @@ int openFile(char *fileName)
 
 	//Check if file exists
 	if((i = namei(fileName)) == -1){
-		printf("[ERROR] Cannot open the file %s. The file doesn't exist\n", fileName);
+		printf("[ERROR] Cannot open file %s. The file doesn't exist\n", fileName);
 		return -1;
 	}
 
 	//Check file integrity
 	if (checkFile(fileName) == -1){
-		printf("[ERROR] Cannot open the file %s. The file is corrupted\n", fileName);
+		printf("[ERROR] Cannot open file %s. The file is corrupted\n", fileName);
 		return -2;
 	}
 
 	//Check if it is already open
 	if(inodes[i].status == OPEN){
-		printf("[ERROR] Cannot open the file %s. The file is already opened\n", fileName);
+		printf("[ERROR] Cannot open file %s. The file is already opened\n", fileName);
 		return -2;
 	}
 
@@ -258,12 +262,12 @@ int openFile(char *fileName)
 int closeFile(int fileDescriptor)
 {
 	if (fileDescriptor < 0 || fileDescriptor >= MAX_FILES){
-		printf("[ERROR] Cannot close the file %d. Invalid file descriptor\n", fileDescriptor);
+		printf("[ERROR] Cannot close file %d. Invalid file descriptor\n", fileDescriptor);
 		return -1;
 	}
 
 	if(inodes[fileDescriptor].status == CLOSE){
-		printf("[ERROR] Cannot close the file %d. It is already closed\n", fileDescriptor);
+		printf("[ERROR] Cannot close file %d. It is already closed\n", fileDescriptor);
 		return -1;
 	}
 
