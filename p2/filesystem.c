@@ -12,13 +12,38 @@
 #include "include/crc.h"			// Headers for the CRC functionality
 
 
+struct superblock sblocks[1];
+struct fs_bitmap bitmaps;
+struct inode inodes[MAX_FILES];
+
+
 /*
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
  * @return 	0 if success, -1 otherwise.
  */
 int mkFS(long deviceSize)
 {
-	return -1;
+
+	int i;
+
+	//Check device size
+	if(deviceSize < MIN_DISK_SIZE || deviceSize > MAX_DISK_SIZE){
+		printf("[ERROR] No valid device size\n");
+		return -1;
+	}
+
+	//Reset superblocks, maps and inodes
+	sblocks[0].magicNum = 1111;
+	sblocks[0].numinodes = MAX_FILES;
+
+
+	//Unmount the file system from the device to write the default file system into disk
+	if(unmountFS() == -1){
+		printf("[ERROR] Cannot unmount the file system\n");
+		return -1;
+	}
+
+	return 0;
 }
 
 /*
