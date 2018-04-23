@@ -229,7 +229,7 @@ int openFile(char *fileName)
 	int i;
 
 	//Check if file exists
-	if((i = iname(fileName)) == -1){
+	if((i = namei(fileName)) == -1){
 		printf("[ERROR] Cannot open the file %s. The file doesn't exist\n", fileName);
 		return -1;
 	}
@@ -257,7 +257,7 @@ int openFile(char *fileName)
  */
 int closeFile(int fileDescriptor)
 {
-	if (fileDescriptor < 0 || fileDescriptor >= MAX_OPEN_FILES){
+	if (fileDescriptor < 0 || fileDescriptor >= MAX_FILES){
 		printf("[ERROR] Cannot close the file %d. Invalid file descriptor\n", fileDescriptor);
 		return -1;
 	}
@@ -297,7 +297,37 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int lseekFile(int fileDescriptor, long offset, int whence)
 {
-	return -1;
+
+	if (fileDescriptor >= MAX_FILES || fileDescriptor < 0){
+		printf("[ERROR] Cannot modify the position of the seek pointer. Invalid file descriptor\n");
+		return -1;
+	}
+	if(inodes[fileDescriptor].status == CLOSE){
+		printf("[ERROR] Cannot modify the position of the seek pointer. The file is closed\n");
+		return -1;
+	}
+
+	int new_position = inodes[fileDescriptor].position + offset;
+	switch (whence) {
+
+		case FS_SEEK_CUR:
+			if (new_position < 0 || new_position > inodes[fileDescriptor].size)
+				return -1;
+			else inodes[fileDescriptor].position = new_position;
+		break;
+
+		case FS_SEEK_END:
+			inodes[fileDescriptor].position = inodes[fileDescriptor].size;
+		break;
+
+		case FS_SEEK_BEGIN:
+			inodes[fileDescriptor].position = 0;
+		break;
+
+		default: return -1;
+	}
+
+	return 0;
 }
 
 /*
@@ -306,7 +336,7 @@ int lseekFile(int fileDescriptor, long offset, int whence)
  */
 int checkFS(void)
 {
-	if(sblocks[0].crc != CRCheck(-1, SB_ID)){
+	if(sblocks[0].crc != CRCheck(SB_ID, -1)){
 		return -1;
 	}
 	return 0;
@@ -319,13 +349,13 @@ int checkFS(void)
 int checkFile(char *fileName)
 {
 	int i;
-	if((i = iname(fileName)) == -1){
+	if((i = namei(fileName)) == -1){
 		printf("[ERROR] Cannot check the file %s. The file doesn't exist\n", fileName);
 		return -2;
 	}
 
-	if (inodes[i].crc != computeCRC(i, F_ID)){
-		printf("[ERROR] The file %d is corrupted\n", fileName);
+	if (inodes[i].crc != CRCheck(F_ID, i)){
+		printf("[ERROR] The file %s is corrupted\n", fileName);
 		return -1;
 	}
 
@@ -438,7 +468,7 @@ int myceil(double x){
 uint32_t CRCheck(int type, int i)
 {
 	uint32_t result = -1;
-	/*char buf[BLOCK_SIZE], *temp_buf;
+	char buf[BLOCK_SIZE], *temp_buf;
 	int j;
 
 	switch(type) {
@@ -497,6 +527,6 @@ uint32_t CRCheck(int type, int i)
 		default:
 			result=-1;
 	}
-	*/
+
 	return result;
 }
