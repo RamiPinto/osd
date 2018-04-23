@@ -185,7 +185,30 @@ int unmountFS(void)
  */
 int createFile(char *fileName)
 {
-	return -2;
+	int i, b;
+	if(namei(fileName) != -1){
+		printf("[ERROR] Error creating file. The file already exists\n");
+		return -1;
+	}
+
+	if((i = ialloc())==-1){
+		printf("[ERROR] Error creating file. Cannot allocate inode\n");
+		return -2;
+	}
+	if((b = balloc())==-1){
+		printf("[ERROR] Error creating file. Cannot allocate data block\n");
+		return -2;
+	}
+
+	//Set inode data
+	strcpy(inodes[i].name, fileName);
+	inodes[i].size = 1;
+	inodes[i].status = CLOSE;
+	inodes[i].position = 0;
+	inodes[i].directBlock = b;
+	inodes[i].crc = 0;
+
+	return 0;
 }
 
 /*
@@ -203,7 +226,29 @@ int removeFile(char *fileName)
  */
 int openFile(char *fileName)
 {
-	return -2;
+	int i;
+
+	//Check if file exists
+	if((i = iname(fileName)) == -1){
+		printf("[ERROR] Cannot open the file %s. The file doesn't exist\n", fileName);
+		return -1;
+	}
+
+	//Check file integrity
+	if (checkFile(fileName) == -1){
+		printf("[ERROR] Cannot open the file %s. The file is corrupted\n", fileName);
+		return -2;
+	}
+
+	//Check if it is already open
+	if(inodes[i].status == OPEN){
+		printf("[ERROR] Cannot open the file %s. The file is already opened\n", fileName);
+		return -2;
+	}
+
+	inodes[i].status = OPEN;
+
+	return i;
 }
 
 /*
@@ -212,7 +257,19 @@ int openFile(char *fileName)
  */
 int closeFile(int fileDescriptor)
 {
-	return -1;
+	if (fileDescriptor < 0 || fileDescriptor >= MAX_OPEN_FILES){
+		printf("[ERROR] Cannot close the file %d. Invalid file descriptor\n", fileDescriptor);
+		return -1;
+	}
+
+	if(inodes[fileDescriptor].status == CLOSE){
+		printf("[ERROR] Cannot close the file %d. It is already closed\n", fileDescriptor);
+		return -1;
+	}
+
+	inodes[fileDescriptor].status = CLOSE;
+
+	return 0;
 }
 
 /*
@@ -249,7 +306,10 @@ int lseekFile(int fileDescriptor, long offset, int whence)
  */
 int checkFS(void)
 {
-	return -2;
+	if(sblocks[0].crc != CRCheck(-1, SB_ID)){
+		return -1;
+	}
+	return 0;
 }
 
 /*
@@ -258,7 +318,18 @@ int checkFS(void)
  */
 int checkFile(char *fileName)
 {
-	return -2;
+	int i;
+	if((i = iname(fileName)) == -1){
+		printf("[ERROR] Cannot check the file %s. The file doesn't exist\n", fileName);
+		return -2;
+	}
+
+	if (inodes[i].crc != computeCRC(i, F_ID)){
+		printf("[ERROR] The file %d is corrupted\n", fileName);
+		return -1;
+	}
+
+	return 0;
 }
 
 

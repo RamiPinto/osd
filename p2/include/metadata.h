@@ -14,7 +14,7 @@
 #define MIN_DISK_SIZE 51200
 #define MAX_DISK_SIZE 10485760
 #define NUM_INODES 64		//64 inodes need exactly 2 blocks
-#define MAX_OPEN_FILES 3	//Not defined in statement
+//#define MAX_OPEN_FILES 3	//Not defined in statement
 
 #define CLOSE 0
 #define OPEN 1
