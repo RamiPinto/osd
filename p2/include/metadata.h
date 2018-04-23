@@ -18,6 +18,8 @@
 
 #define CLOSE 0
 #define OPEN 1
+#define SB_ID 0
+#define F_ID 1
 
 #define SB_PADDING 2012		//To complete 1 Block
 #define I_PADDING 7			//To complete 64 bytes
@@ -36,7 +38,7 @@ typedef struct superblock{
 	unsigned int magicNum;			//Magic number fo the superblock
 	unsigned int mapNumBlocks;		// Number of blocks of the bitmaps
 	unsigned int numinodes;			//Number of i-nodes in the deviceSize
-	unsigned int firstinode;		//Number fo the first inode in the device
+	unsigned int firstinode;		//Number of the first inode in the device
 	unsigned int dataNumBlock;		//Number of data blocks in the device
 	unsigned int firstDataBlock;	// Number fo first data block
 	unsigned int deviceSize;		// Total disk space

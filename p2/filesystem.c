@@ -260,3 +260,172 @@ int checkFile(char *fileName)
 {
 	return -2;
 }
+
+
+/********************************************************/
+/*ADDITIONAL FUNCTIONS*/
+
+int ialloc()
+{
+	int i;
+	for(i = 0; i < sblocks[0].numinodes; i++){
+		if(bitmaps->inodes_map[i] == 0){	//Free inodes
+			bitmaps->inodes_map[i] = 1;
+			return i;
+		}
+	}
+
+	//No free inodes
+	return -1;
+}
+
+int ifree(int i)
+{
+	if(i > sblocks[0].numinodes || i < 0){
+		printf("[ERROR] Cannot free inode. No valid inode id\n");
+		return -1;
+	}
+
+	bzero(inodes[i].name, MAX_FILE_NAME);
+	bitmaps->inodes_map[i] = 0;
+
+	return 0;
+}
+
+int balloc()
+{
+	int i;
+	for(i = 0; i < sblocks[0].dataNumBlock; i++){
+		if(bitmaps->dataBlocks_map[i] == 0){
+			bitmaps->dataBlocks_map[i] = 1;
+			return i;
+		}
+	}
+	return -1;
+}
+
+int bfree(int i)
+{
+	char buf[BLOCK_SIZE];
+
+	if(i > sblocks[0].dataNumBlock || i < 0){
+		printf("[ERROR] Cannot free data block. No valid data block id\n");
+		return -1;
+	}
+
+	bzero(buf, BLOCK_SIZE);
+	if(bwrite(DEVICE_IMAGE, (i + sblocks[0].firstDataBlock), buf) == -1){
+		printf("[ERROR] Cannot free data block. Error removing block data\n");
+		return -1;
+	}
+	bitmaps->dataBlocks_map[i] = 0;
+	return 0;
+}
+
+int namei(char *name)
+{
+	int i, result=-1;
+	for (i = 0; i < sblocks[0].numinodes; i++){
+		if(!strcmp(inodes[i].name, name)){
+			result = i;
+		}
+		else{
+			result = -1;
+		}
+	}
+	return result;
+}
+
+int bmap(int i, int offset)
+{
+	if(i>sblocks[0].numinodes || i<0 || offset < 0){
+		printf("[ERROR] Cannot locate data block. No valid data block id\n");
+		return -1;
+	}
+
+	//Return inode block
+	if(offset < BLOCK_SIZE){
+		return inodes[i].directBlock;
+	}
+
+	return -1;
+}
+
+int myceil(double x){
+	int y = (int) x, result;
+	if((x - y) > 0){
+		result = y+1;
+	}
+	else{
+		result = y;
+	}
+
+	return result;
+}
+
+
+uint32_t CRCheck(int type, int i)
+{
+	uint32_t result = -1;
+	/*char buf[BLOCK_SIZE], *temp_buf;
+	int j;
+
+	switch(type) {
+		case SB_ID: //Superblock: get metadata (inodes + bitmaps)
+			temp_buf = malloc(5*BLOCK_SIZE); //3 blocks bitmaps + 2 blocks inodes
+
+			//Read bitmaps
+			for(j = 0; j < 3 ; j++){	//bitmaps fill 3 blocks in memory
+				if(bread(DEVICE_IMAGE, j+2, buf + (j*BLOCK_SIZE)) == -1){
+					printf("[ERROR] Cannot mount the fs. Error reading bitmaps\n");
+					return -1;
+				}
+				else{
+					strncpy((char *) temp_buf + (j * BLOCK_SIZE), buf, BLOCK_SIZE);
+				}
+			}
+
+			//Read inodes
+			for(j = 0; j < 2 ; j++){	//inodes fill 2 blocks in memory
+				if(bread(DEVICE_IMAGE, (j + sblocks[0].firstinode), buf) == -1 ){
+					printf("[ERROR] Cannot mount the fs. Error reading inodes\n");
+					return -1;
+				}
+				else{
+					strncpy((char *) temp_buf + ((3 + j) * BLOCK_SIZE), buf, BLOCK_SIZE);
+				}
+			}
+
+			result = CRC32((const unsigned char *) temp_buf, 5*BLOCK_SIZE, sblocks[0].crc);
+			free(temp_buf);
+		break;
+
+		case F_ID:
+			if(i<0 || i>=MAX_FILES){
+				printf("[ERROR] Cannot execute CRC. No valid inode id\n");
+				return -1;
+			}
+
+			temp_buf = malloc(inodes[i].size);
+			int num_blocks = myceil(inodes[i].size/BLOCK_SIZE);
+
+			for(j = 0; j < num_blocks; j++){
+				if(bread(DEVICE_IMAGE, (j + inodes[i].directBlock), buf) == -1){
+					printf("[ERROR] Cannot execute CRC. Error reading file\n");
+					return -1;
+				}
+				else{
+					strncpy((char *) temp_buf + (j * BLOCK_SIZE), buf, BLOCK_SIZE);
+				}
+			}
+
+			result = CRC32((const unsigned char *) temp_buf, inodes[i].size, inodes[i].crc);
+			free(temp_buf);
+		break;
+
+		default:
+			result=-1;
+	}
+	*/
+	return result;
+}
