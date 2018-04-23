@@ -25,8 +25,9 @@ int main() {
 	int ret;
 
 	///////
-
+	printf("Starting test...\n");
 	ret = mkFS(DEV_SIZE);
+	printf("mkFS done\n");
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 		return -1;

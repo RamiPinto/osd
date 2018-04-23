@@ -6,16 +6,21 @@
  * @date	01/03/2017
  */
 
+#include <stdlib.h>
+#include <strings.h>
+#include <string.h>
+#include <stdint.h>
+#include <stdio.h>
+
 #include "include/filesystem.h"		// Headers for the core functionality
 #include "include/auxiliary.h"		// Headers for auxiliary functions
 #include "include/metadata.h"		// Type and structure declaration of the file system
 #include "include/crc.h"			// Headers for the CRC functionality
 
 
-struct superblock sblocks[1];
-struct fs_bitmap bitmaps;
-struct inode inodes[MAX_FILES];
-
+struct superblock *sblocks;
+struct fs_bitmap *bitmaps;
+struct inode *inodes;
 
 /*
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
@@ -23,7 +28,6 @@ struct inode inodes[MAX_FILES];
  */
 int mkFS(long deviceSize)
 {
-
 	int i;
 
 	//Check device size
@@ -32,9 +36,41 @@ int mkFS(long deviceSize)
 		return -1;
 	}
 
+	char reset[BLOCK_SIZE];
+	bzero(reset, BLOCK_SIZE);
+	for (i = 0; i < (deviceSize/BLOCK_SIZE); i++){
+		if (bwrite(DEVICE_IMAGE, i, reset) == -1){
+			printf("[ERROR] Error reseting device: %d\n", i);
+			return -1;
+		}
+	}
+
 	//Reset superblocks, maps and inodes
-	sblocks[0].magicNum = 1111;
-	sblocks[0].numinodes = MAX_FILES;
+	sblocks = malloc(sizeof(struct superblock));
+	sblocks[0].magicNum = 0x29A;
+	sblocks[0].mapNumBlocks = 3;
+	sblocks[0].numinodes = NUM_INODES; //TODO: Check if MAX_FILES or NUM_INODES
+	sblocks[0].firstinode = 5;
+	sblocks[0].dataNumBlock = (unsigned int) ((deviceSize-7*BLOCK_SIZE)/BLOCK_SIZE);
+	sblocks[0].firstDataBlock = 7;
+	sblocks[0].deviceSize = deviceSize;
+	sblocks[0].crc = 0;
+
+	/*bitmaps = malloc(sizeof(struct fs_bitmap));
+
+	//Free inodes bitmap
+	for(i = 0; i < sblocks[0].numinodes; i++){
+		bitmaps[0].inodes_map[i] = 0;
+	}
+
+	//Free data blocks bitmap
+	for(i = 0; i < sblocks[0].dataNumBlock; i++){
+		bitmaps[0].dataBlocks_map[i] = 0;
+	}
+
+	for(i = 0; i < sblocks[0].numinodes; i++){
+		memset(&(inodes[i]), 0, sizeof(struct inode));
+	}*/
 
 
 	//Unmount the file system from the device to write the default file system into disk
@@ -52,7 +88,55 @@ int mkFS(long deviceSize)
  */
 int mountFS(void)
 {
-	return -1;
+	int i,j;
+	char buf[BLOCK_SIZE], bm_buf[3*BLOCK_SIZE];
+
+	//Allocate memory
+	sblocks = malloc(sizeof(struct superblock));
+	bitmaps = malloc(sizeof(struct fs_bitmap));
+	inodes = malloc (sizeof(struct inode) * NUM_INODES);
+
+	//Read superblock
+	if(bread(DEVICE_IMAGE, 1, buf) == -1){
+		printf("[ERROR] Cannot mount the fs. Error reading superblock\n");
+		return -1;
+	}
+	struct superblock *temp_sb = (struct superblock *) buf;
+	sblocks[0] = *temp_sb;
+
+	//Read bitmaps
+	for(i = 0; i < 3 ; i++){	//bitmaps fill 3 blocks in memory
+		if(bread(DEVICE_IMAGE, i+2, bm_buf + (i*BLOCK_SIZE)) == -1){
+			printf("[ERROR] Cannot mount the fs. Error reading bitmaps\n");
+			return -1;
+		}
+	}
+	struct fs_bitmap *temp_bm = (struct fs_bitmap *) bm_buf;
+	bitmaps[0] = *temp_bm;
+
+	//Read inodes
+	for(i = 0; i < 2 ; i++){	//inodes fill 2 blocks in memory
+		if(bread(DEVICE_IMAGE, (i + sblocks[0].firstinode), buf) == -1 ){
+			printf("[ERROR] Cannot mount the fs. Error reading inodes\n");
+			return -1;
+		}
+		else{
+			for(j = 0; j < 32; j++){
+				char inode_buf[sizeof(struct inode)];
+				memcpy(inode_buf, buf + (sizeof(struct inode) * j), sizeof(struct inode)); //Copy single inodes
+				struct inode *temp_in = (struct inode *) inode_buf;
+				inodes[j] = *temp_in;
+			}
+		}
+	}
+
+	//TODO: Check integrity
+	/*if(checkFS() == -1){
+		printf("[ERROR] Cannot mount the fs. Error checking data integrity. ");
+		return -1;
+	} */
+
+	return 0;
 }
 
 /*
@@ -61,7 +145,38 @@ int mountFS(void)
  */
 int unmountFS(void)
 {
-	return -1;
+	int i;
+
+	//Write inodes
+	for(i = 0; i < 2 ; i++){	//inodes fill 2 blocks in memory
+		if(bwrite(DEVICE_IMAGE, (i + sblocks[0].firstinode), ((char *) inodes + (i*BLOCK_SIZE))) == -1 ){
+			printf("[ERROR] Cannot unmount the fs. Error writing inodes\n");
+			return -1;
+		}
+	}
+
+	//Write bitmaps
+	for(i = 0; i < 3 ; i++){	//bitmaps fill 3 blocks in memory
+		if(bwrite(DEVICE_IMAGE, i+2, ((char *) bitmaps + (i*BLOCK_SIZE))) == -1){
+			printf("[ERROR] Cannot unmount the fs. Error writing bitmaps\n");
+			return -1;
+		}
+	}
+
+	//TODO: CALCULATE NEW CRC
+
+	//Write superblock
+	if(bwrite(DEVICE_IMAGE, 1, (char *) sblocks) == -1){
+		printf("[ERROR] Cannot unmount the fs. Error writing superblock\n");
+		return -1;
+	}
+
+	//Free resources
+	free(inodes);
+	free(bitmaps);
+	free(sblocks);
+
+	return 0;
 }
 
 /*
